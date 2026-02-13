@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>答案之书</title>
+<style>
+body{font-family:system-ui;margin:0;background:#0f0f0f;color:#fff;}
+.wrap{max-width:520px;margin:0 auto;padding:20px;}
+a{color:#fff;text-decoration:none;display:inline-block;padding:10px 12px;border:1px solid #2a2a2a;border-radius:12px;background:#111;}
+.card{margin-top:14px;padding:14px;border:1px solid #2a2a2a;border-radius:16px;background:#151515;white-space:pre-line;line-height:1.7;}
+input,button{width:100%;margin-top:10px;padding:14px;border-radius:14px;border:1px solid #2a2a2a;background:#111;color:#fff;}
+button{background:#d4af37;color:#000;font-weight:700;border:none;cursor:pointer;}
+.small{opacity:.75;font-size:12px;margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a href="index.html">← 返回首页</a>
+
+  <div class="card">
+    <h2 style="margin:6px 0 0 0;">答案之书（随机）</h2>
+    <div class="small">心诚则灵</div>
+    <input id="q" placeholder="可选：输入你的问题">
+    <button onclick="draw()">抽一个答案</button>
+    <div class="small">已加载答案条数：<span id="count">0</span></div>
+  </div>
+
+  <div id="out" class="card" style="display:none;"></div>
+</div>
+
+<script>
+let ANSWERS=[];
+
+async function loadAnswers(){
+  const res = await fetch("./data/answers.txt", { cache:"no-store" });
+  if(!res.ok) throw new Error("answers.txt 加载失败：HTTP "+res.status);
+  const txt = await res.text();
+  return txt.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+}
+
+function pick(arr){
+  return arr[Math.floor(Math.random()*arr.length)];
+}
+
+async function init(){
+  try{
+    ANSWERS = await loadAnswers();
+    document.getElementById("count").textContent = ANSWERS.length;
+  }catch(e){
+    document.getElementById("count").textContent = "加载失败";
+    console.error(e);
+  }
+}
+
+async function draw(){
+  if(!ANSWERS.length) await init();
+  if(!ANSWERS.length){
+    alert("答案库为空或加载失败。请确认 data/answers.txt 已上传。");
+    return;
+  }
+  const a = pick(ANSWERS);
+  const q = document.getElementById("q").value.trim() || "（未填写）";
+  const out = document.getElementById("out");
+  out.style.display="block";
+  out.innerHTML = `【你的问题】\n${q}\n\n【答案】\n${a}`;
+}
+
+init();
+</script>
+</body>
+</html>
