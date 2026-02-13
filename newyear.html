@@ -3,43 +3,220 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>新年占卜版</title>
+<title>2026 马年新年占卜</title>
+
 <style>
 body{font-family:system-ui;margin:0;background:#0f0f0f;color:#fff;}
 .wrap{max-width:520px;margin:0 auto;padding:20px;text-align:center;}
 a{color:#fff;text-decoration:none;display:inline-block;padding:10px 12px;border:1px solid #2a2a2a;border-radius:12px;background:#111;}
-.card{margin-top:14px;padding:16px;border:1px solid #2a2a2a;border-radius:16px;background:#151515;white-space:pre-line;line-height:1.8;text-align:left;}
+.card{
+  margin-top:14px;padding:18px;border:1px solid #2a2a2a;border-radius:18px;background:#151515;
+  white-space:pre-line;line-height:1.9;text-align:left;
+}
 h2{margin:10px 0 0 0;text-align:center;}
-.btn{width:100%;margin-top:12px;padding:14px;border-radius:14px;border:none;background:#d4af37;color:#000;font-weight:800;cursor:pointer;}
-.quote{font-size:18px}
-.small{opacity:.75;font-size:12px;margin-top:10px}
+input,button{
+  width:100%;margin-top:12px;padding:14px;border-radius:16px;border:1px solid #2a2a2a;background:#111;color:#fff;
+}
+button{background:#d4af37;color:#000;font-weight:800;border:none;cursor:pointer;font-size:16px;}
+.small{opacity:.7;font-size:12px;margin-top:8px;text-align:left;}
+.badge{display:inline-block;margin-top:10px;padding:6px 10px;border:1px dashed #444;border-radius:999px;background:#101010;font-size:12px;opacity:.9;}
+hr{border:none;border-top:1px solid #2a2a2a;margin:14px 0;}
 </style>
 </head>
+
 <body>
 <div class="wrap">
   <a href="index.html">← 返回首页</a>
 
   <div class="card">
-    <h2>新年占卜版</h2>
-    <div class="small">点击开始马年占卜</div>
-    <button class="btn" onclick="show()">开始占卜</button>
+    <h2>2026 马年新年占卜</h2>
+    <div class="small">输入姓名后点击生成。</div>
+    <input id="name" placeholder="输入姓名/昵称（可选）">
+    <button onclick="draw()">开始占卜</button>
+    <div class="small">提示：心诚则灵。</div>
   </div>
 
   <div id="out" class="card" style="display:none;"></div>
 </div>
 
 <script>
-function show(){
+/* ===== 开运签（你给的口号库） ===== */
+const slogans=[
+  "拒绝牛马，只做骏马！",
+  "马力全开，拒绝内卷！",
+  "好运加码，马上致富！",
+  "事业黑马，逆袭必胜！",
+  "快乐马上，烦恼清零！",
+  "马上有钱，存款翻番！",
+  "马上有房，住进天堂！",
+  "马上脱单，爱情美满！",
+  "马甲线有，身材走秀！",
+  "马力十足，永不疲惫！",
+  "拒绝马虎，万事稳固！",
+  "马上放假，快乐到家！",
+  "马上面试，一投必过！",
+  "马上涨薪，老板贴心！",
+  "神马都有，啥都不愁！",
+  "马力冲天，薪资翻天！",
+  "不做马大哈，稳赢全家！",
+  "马上转运，锦鲤附身！",
+  "马不停蹄，奔向心仪！",
+  "马上升职，不费心思！",
+  "马力满格，状态无敌！",
+  "马上出发，环游天下！",
+  "马上开挂，路子超大！",
+  "颜值马力，双重暴击！",
+  "马上通关，生活不难！",
+  "马年限定，好运指定！",
+  "马上变美，自信不悔！",
+  "马到成功，拒绝做梦！",
+  "马力加持，业绩如诗！",
+  "马上吃肉，不长肥肉！",
+  "马上躺平，心情安宁！",
+  "马上起飞，快乐翻倍！",
+  "马上躺赢，生活轻盈！",
+  "马力强劲，财气逼人！",
+  "马力澎湃，人见人爱！",
+  "马上有戏，全场第一！",
+  "马上暴富，钱途广阔！",
+  "马不停蹄，快乐第一！",
+  "马上聚餐，好胃常在！",
+  "马力觉醒，不再清醒！",
+  "马上顺心，生活如金！",
+  "马上惊喜，锦上添花！",
+  "马上自由，快乐无忧！",
+  "马上升温，感情加分！",
+  "马上得奖，财气满仓！",
+  "马力加速，抛弃忧郁！",
+  "马上见面，好运不断！",
+  "马上搞定，事事顺心！",
+  "马上升咖，你是大咖！",
+  "马年2026，一路溜溜！"
+];
+
+/* ===== 多段祝福库 ===== */
+const overall=[
+  "马年顺风顺水顺财神，整体运势处在上升通道。",
+  "马到成功之年，推进力与执行力同步增强。",
+  "运势稳中带升，贵人与机遇并行出现。",
+  "整体节奏顺畅，关键节点更易突破。",
+  "属于扩张与兑现并行的一年。"
+];
+
+const career=[
+  "Nature / Cell / Science 发发发，成果窗口明显。",
+  "论文产出顺利，投稿与修改节奏流畅。",
+  "项目推进加速，关键节点更易落地。",
+  "适合冲刺高质量成果与头部结果。",
+  "学术能量高涨，灵感与执行同步增强。"
+];
+
+const love=[
+  "有对象的感情顺利，关系稳步升温。",
+  "没对象的会遇到缘分，互动匹配度提升。",
+  "适合推进关系与明确未来规划。",
+  "沟通更顺畅，误解减少，默契增加。",
+  "属于情感推进窗口期。"
+];
+
+const wealth=[
+  "财运走强，资源与机会同步流动。",
+  "正财稳定增长，偏财偶有惊喜。",
+  "收入结构优化，现金流更稳。",
+  "花得起也攒得住：先预算再享受。",
+  "钱钱花不完，但仍要理性配置。"
+];
+
+const health=[
+  "不会饿肚子，身体状态稳定。",
+  "身材嘎嘎好，代谢与恢复力增强。",
+  "作息规律度提升，精力更充沛。",
+  "压力可控，保持轻运动更稳。",
+  "整体健康运平稳向上。"
+];
+
+const fortune=[
+  "福气临门，贵人暗中助力。",
+  "好运叠加，关键时刻总有人相助。",
+  "福报积累显现，阻力减少。",
+  "机缘与运气同步增强。",
+  "顺势而行的一年，别犹豫太久。"
+];
+
+const closing=[
+  "总结：今年不是“想想看”的年份，是“做出来”的年份。盯住一个主目标，推进到底。",
+  "总结：把节奏抓稳，别被情绪带着走；稳住就赢一半。",
+  "总结：你只要开始跑，路就会让开；你只要不停，结果就会靠近。"
+];
+
+/* ===== 基于姓名的“稳定随机” =====
+   让同一个名字每次抽取更有一致性，但依然有波动。
+*/
+function hashName(str){
+  let h=2166136261;
+  for(let i=0;i<str.length;i++){
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h>>>0);
+}
+
+function seededPick(arr, seed, salt){
+  const x = (seed + salt*1315423911) >>> 0;
+  return arr[x % arr.length];
+}
+
+function randPick(arr){
+  return arr[Math.floor(Math.random()*arr.length)];
+}
+
+/* 结合：姓名为空 → 全随机；姓名不空 → “主句稳定 + 辅句随机” */
+function pickWithName(arr, seed, salt){
+  if(!seed) return randPick(arr);
+  // 70% 稳定，30% 随机波动
+  return (Math.random()<0.7) ? seededPick(arr, seed, salt) : randPick(arr);
+}
+
+/* ===== 主生成 ===== */
+function draw(){
+  const nameRaw = document.getElementById("name").value.trim();
+  const name = nameRaw ? nameRaw : "你";
+  const seed = nameRaw ? hashName(nameRaw) : 0;
+
+  const slogan = pickWithName(slogans, seed, 1);
+  const o = pickWithName(overall, seed, 2);
+  const c = pickWithName(career, seed, 3);
+  const l = pickWithName(love, seed, 4);
+  const w = pickWithName(wealth, seed, 5);
+  const h = pickWithName(health, seed, 6);
+  const f = pickWithName(fortune, seed, 7);
+  const end = pickWithName(closing, seed, 8);
+
   const text =
-`马年顺风顺水顺财神，Nature / Cell / Science 发发发。
-有对象的感情顺利，没对象的会一场如龙卷风一般的缘分。
-马到成功，福气临门。
-不会饿肚子，身材嘎嘎好。
-钱钱花不完，世界和平又快乐。`;
+`【${name} 的 2026 马年占卜结果】
+
+【开运签】
+${slogan}
+
+${o}
+
+${c}
+
+${l}
+
+${w}
+
+${h}
+
+${f}
+
+${end}
+
+${nameRaw ? "（提示：同一个名字会更偏向同一类风格）" : "（提示：填上名字可获得更“专属”的结果）"}`;
 
   const out=document.getElementById("out");
   out.style.display="block";
-  out.innerHTML = `【你的新年占卜结果】\n\n${text}`;
+  out.innerHTML = text;
 }
 </script>
 </body>
