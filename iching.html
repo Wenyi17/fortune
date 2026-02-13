@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>易经（时间起卦）</title>
+<style>
+  body{font-family:system-ui; margin:0; background:#0f0f0f; color:#fff;}
+  .wrap{max-width:520px; margin:0 auto; padding:20px;}
+  a{color:#fff; text-decoration:none; display:inline-block; padding:10px 12px; border:1px solid #2a2a2a; border-radius:12px; background:#111;}
+  .card{margin-top:14px; padding:14px; border:1px solid #2a2a2a; border-radius:16px; background:#151515;  white-space: pre-line;line-height:1.6;}
+  .muted{color:#bdbdbd; font-size:13px; line-height:1.5;}
+  button{width:100%; margin-top:10px; padding:14px 12px; border-radius:14px; border:1px solid #2a2a2a; background:#111; color:#fff; font-size:16px;}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;}
+  .kpi{background:#141414; border:1px solid #2a2a2a; border-radius:14px; padding:12px;}
+  .kpi b{display:block; font-size:14px; color:#ddd;}
+  .bar{height:10px; background:#2a2a2a; border-radius:999px; overflow:hidden; margin-top:8px;}
+  .bar>div{height:100%; background:#fff;}
+  .score{font-size:20px; margin-top:6px;}
+  .hr{height:1px; background:#2a2a2a; margin:12px 0;}
+  .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas; font-size:12px; color:#aaa;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a href="index.html">← 返回首页</a>
+
+  <div class="card">
+    <h2 style="margin:0 0 8px; font-size:20px;">易经（时间起卦）</h2>
+    <div class="muted">点击“起卦”后，用当前时间按固定规则生成上卦/下卦/动爻；结果完全可复现（同一秒点击会得到同一结果）。</div>
+    <button onclick="cast()">起卦</button>
+  </div>
+
+  <div class="card" id="out" style="display:none;"></div>
+</div>
+
+<script>
+const TRIGRAMS = [
+  {id:0, name:"坤", element:"土", bias:{health:+8, wealth:+6, academic:+2, love:+4}, tag:"承载/稳定"},
+  {id:1, name:"震", element:"木", bias:{health:+4, wealth:+2, academic:+6, love:+2}, tag:"启动/变化"},
+  {id:2, name:"坎", element:"水", bias:{health:-2, wealth:+2, academic:+8, love:+0}, tag:"压力/深思"},
+  {id:3, name:"兑", element:"金", bias:{health:+0, wealth:+6, academic:+2, love:+8}, tag:"沟通/愉悦"},
+  {id:4, name:"艮", element:"土", bias:{health:+6, wealth:+4, academic:+6, love:-2}, tag:"止/专注"},
+  {id:5, name:"离", element:"火", bias:{health:+2, wealth:+4, academic:+4, love:+6}, tag:"显化/热情"},
+  {id:6, name:"巽", element:"木", bias:{health:+2, wealth:+6, academic:+6, love:+4}, tag:"渗透/成长"},
+  {id:7, name:"乾", element:"金", bias:{health:+2, wealth:+8, academic:+4, love:+2}, tag:"主动/推进"}
+];
+
+// 基础分（不随机）
+const BASE = {love:65, academic:65, wealth:65, health:65};
+
+function clamp(x){ return Math.max(0, Math.min(100, Math.round(x))); }
+
+function renderScores(s){
+  const items = [
+    ["姻缘","love",s.love],
+    ["学术前途","academic",s.academic],
+    ["财运","wealth",s.wealth],
+    ["健康","health",s.health]
+  ];
+  return `
+    <div class="grid">
+      ${items.map(([cn,k,v])=>`
+        <div class="kpi">
+          <b>${cn}</b>
+          <div class="score">${v}</div>
+          <div class="bar"><div style="width:${v}%"></div></div>
+          <div class="muted" style="margin-top:8px;">${advice(k,v)}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function advice(k,v){
+
+  if(k==="love"){
+    if(v>=80) return `
+你当前的姻缘运势处在明显的上升与推进窗口期。无论是已有关系的深化，还是新关系的建立，都具备较高的成功概率。此阶段最重要的是“表达与确认”，把内心真实需求、边界与期待讲清楚，避免暧昧与误解长期积累。
+
+如果已有伴侣，这是适合讨论未来规划、生活节奏甚至长期承诺的阶段；如果仍在暧昧或观察中，则应主动创造相处机会，通过真实互动判断匹配度，而不是停留在想象或猜测。
+
+需要注意的是，运势高不代表无需经营。越顺利时越要避免情绪化与控制欲，保持尊重与空间，反而更能巩固关系稳定度。
+`;
+    else if(v>=65) return `
+当前感情运势处于可发展但需谨慎经营的阶段。关系推进的关键在于沟通质量，而不是推进速度。很多误会往往源于信息不对称或过度解读，因此建议减少猜测，多用直接交流取代情绪推断。
+
+如果你在一段关系中感到不确定，此阶段更适合通过相处频率与共同经历去验证，而不是急于下结论。对方的回应节奏、投入程度，都需要时间观察。
+
+整体来说，这是一个“修正与磨合期”，只要沟通方式得当，关系仍有较大提升空间。
+`;
+    else return `
+姻缘运势目前偏低，更像是一个整理内在关系模式与情绪状态的阶段，而非外在关系推进期。此时容易出现沟通失衡、期待落差或情绪波动，因此不宜仓促做出情感决策。
+
+若强行推进关系，往往会因节奏不一致或需求错位产生压力。更适合把重心放在自我状态调整，例如界限感建立、自我价值感修复，以及过往关系经验复盘。
+
+当内在稳定度提升后，外在关系自然会随之改善。
+`;
+  }
+
+  if(k==="academic"){
+    if(v>=80) return `
+学术与学习运势处在高效产出期，是典型的“冲刺窗口”。无论是论文写作、项目推进、实验验证还是课程作业，都更容易进入高专注与高执行状态。
+
+建议优先处理可交付成果，例如论文初稿、实验结果整理、报告提交等，把阶段性成果尽快固化。此阶段灵感与效率并存，拖延反而会削弱优势。
+
+同时也要注意节奏管理，避免过度透支精力。高效率期若能配合规律作息与适度运动，产出质量会更稳定。
+`;
+    else if(v>=65) return `
+当前学术运势属于稳步提升阶段，更适合打基础与系统复盘，而非盲目冲刺。此阶段对知识结构梳理、方法论优化以及薄弱环节修补尤其有利。
+
+建议把学习目标拆解为可执行清单，通过逐项完成建立信心。同时适合与导师或同伴交流，借助外部反馈修正方向。
+
+只要节奏稳定推进，后续进入高产出期的概率会显著提升。
+`;
+    else return `
+学术运势处于相对低谷，更像是恢复与重建阶段。此时注意力容易分散，学习效率波动较大，强行高强度投入反而会增加挫败感。
+
+建议先从作息与学习环境入手，重建稳定节奏。把任务缩小到最低可执行单位，例如每日固定学习时段或单一任务完成。
+
+当基础稳定后，再逐步提高难度与负荷，会比直接冲刺更有效。
+`;
+  }
+
+  if(k==="wealth"){
+    if(v>=80) return `
+财运处在机会密集期，资源流动性与机会出现频率均较高。此阶段无论是收入增长、项目机会还是投资回报，都更容易出现正向反馈。
+
+但机会增加同时意味着决策复杂度上升。建议设定清晰的风险上限与资金配置比例，避免因过度自信而承担不必要风险。
+
+如果能把握节奏、合理规划，此阶段更偏向长期积累与结构优化，而非短期暴利。
+`;
+    else if(v>=65) return `
+财运处于稳健运行阶段，更适合守成与规划，而非激进扩张。收入结构稳定，但额外收益机会有限，因此理财重点应放在预算管理与现金流优化。
+
+建议减少冲动消费与高风险投资，把资源投入到确定性更高的领域，例如技能提升或长期储蓄。
+
+整体属于“稳中求进”区间。
+`;
+    else return `
+财运当前偏保守，更适合收缩与防守。此阶段容易出现额外支出或收益波动，因此不宜进行高风险投资或大额决策。
+
+建议优先建立安全储备，控制非必要开支，同时重新评估收入结构与支出比例。
+
+当财务稳定度恢复后，再考虑扩张与投资更为稳妥。
+`;
+  }
+
+  if(k==="health"){
+    if(v>=80) return `
+健康状态整体处于良好区间，体能恢复力与精神稳定度较高。此阶段适合维持既有健康习惯，例如规律作息、适度运动与均衡饮食。
+
+如果有健身或体能目标，此时也是推进训练强度的合适阶段。但仍需避免过度消耗，保持恢复与训练平衡。
+
+整体属于“可维持可强化”的健康窗口。
+`;
+    else if(v>=65) return `
+健康运势处于可控但需注意阶段。身体未必出现明显问题，但容易因作息紊乱或压力累积产生疲劳感。
+
+建议优先优化睡眠质量与作息规律，同时通过轻运动或户外活动缓解压力。
+
+只要生活节奏调整到位，健康状态可迅速回升。
+`;
+    else return `
+健康运势偏弱，更像是身体与心理的恢复期。此阶段容易出现精力下降、睡眠不足或情绪波动等状况。
+
+建议减少高压安排，把恢复放在优先位置，例如保证睡眠、降低工作负荷、增加放松活动。
+
+当基础恢复后，再逐步恢复高强度节奏更为安全。
+`;
+  }
+
+  return "";
+}
+
+
+function cast(){
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth()+1;
+  const d = now.getDate();
+  const hh = now.getHours();
+  const mm = now.getMinutes();
+  const ss = now.getSeconds();
+
+  const upper = (y + m + d) % 8;
+  const lower = (hh + mm) % 8;
+  const moving = (ss % 6) + 1;
+
+  const U = TRIGRAMS[upper];
+  const L = TRIGRAMS[lower];
+
+  // 四项分：基础 + 上卦偏置*0.6 + 下卦偏置*0.6 + 动爻微调（确定性）
+  const tweak = (moving - 3.5) * 2; // -5..+5
+  const scores = {
+    love:   clamp(BASE.love   + 0.6*U.bias.love   + 0.6*L.bias.love   + tweak),
+    academic:clamp(BASE.academic+0.6*U.bias.academic+0.6*L.bias.academic+ tweak),
+    wealth: clamp(BASE.wealth + 0.6*U.bias.wealth + 0.6*L.bias.wealth + tweak),
+    health: clamp(BASE.health + 0.6*U.bias.health + 0.6*L.bias.health + tweak)
+  };
+
+  const out = document.getElementById("out");
+  out.style.display="block";
+  out.innerHTML = `
+    <div><b>起卦时间：</b>${now.toLocaleString()}</div>
+    <div class="hr"></div>
+    <div><b>卦象：</b>上卦「${U.name}」(${U.element} / ${U.tag})，下卦「${L.name}」(${L.element} / ${L.tag})，动爻：第 ${moving} 爻</div>
+    <div class="mono" style="margin-top:8px;">规则：上卦=(年+月+日)%8；下卦=(时+分)%8；动爻=(秒%6)+1（完全可复现）</div>
+    <div class="hr"></div>
+    <div><b>四项结果</b></div>
+    ${renderScores(scores)}
+  `;
+}
+</script>
+</body>
+</html>

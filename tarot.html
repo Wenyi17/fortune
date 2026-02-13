@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>塔罗占卜（姻缘/学业/财运/健康）</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:#111; color:#fff; margin:0; padding:20px;}
+    h1{font-size:22px; margin:0 0 12px;}
+    .row{display:flex; gap:10px; flex-wrap:wrap; margin:12px 0;}
+    select, button, input{font-size:16px; padding:10px 12px; border-radius:10px; border:1px solid #333; background:#1b1b1b; color:#fff;}
+    button{cursor:pointer;}
+    .card{background:#171717; border:1px solid #2a2a2a; border-radius:16px; padding:14px; margin-top:12px;white-space: pre-line;line-height:1.6;}
+    .muted{color:#bbb; font-size:13px; line-height:1.4;}
+    .grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;}
+    .kpi{background:#141414; border:1px solid #2a2a2a; border-radius:14px; padding:12px;}
+    .kpi b{display:block; font-size:14px; color:#ddd;}
+    .bar{height:10px; background:#2a2a2a; border-radius:999px; overflow:hidden; margin-top:8px;}
+    .bar > div{height:100%; background:#fff; width:0%;}
+    .score{font-size:20px; margin-top:6px;}
+    .pill{display:inline-block; padding:4px 10px; border:1px solid #333; border-radius:999px; font-size:12px; color:#ccc; margin-left:6px;}
+    .hr{height:1px; background:#2a2a2a; margin:12px 0;}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas; font-size:12px; color:#aaa;}
+  </style>
+</head>
+<body>
+  <h1>🃏 塔罗占卜</h1>
+  <div class="muted">
+    随机抽牌（符合塔罗机制）；分数与解读来自固定牌义库与映射规则。输出聚焦：姻缘 / 学术前途 / 财运 / 健康。
+  </div>
+
+  <div class="row">
+    <select id="spread">
+      <option value="one">单牌（快速）</option>
+      <option value="three">三牌（过去/现在/未来）</option>
+    </select>
+
+    <select id="focus">
+      <option value="balanced">综合（四项均衡）</option>
+      <option value="love">姻缘优先</option>
+      <option value="academic">学术优先</option>
+      <option value="wealth">财运优先</option>
+      <option value="health">健康优先</option>
+    </select>
+
+    <button onclick="draw()">抽牌</button>
+  </div>
+
+  <div class="card" id="result" style="display:none;"></div>
+
+<script>
+/**
+ * 说明：
+ * - 这里用“大阿尔卡纳 22张”做 MVP。你要 78 张我也能给你扩到全牌库。
+ * - 每张牌：基础四项分 (0-100)，正位/逆位文案
+ * - 最终分：对抽到的牌做加权平均（单牌=该牌，三牌=过去0.25 现在0.5 未来0.25）
+ * - focus 会改变加权（比如姻缘优先会给 love 更高权重，但不引入随机）
+ */
+
+const MAJOR = [
+  { name:"愚者", upright:"新开始与尝试，先行动再修正。", reversed:"冲动与不确定，先稳住节奏。",
+    base:{love:70, academic:68, wealth:60, health:65} },
+  { name:"魔术师", upright:"资源到位，适合主动出击与表达。", reversed:"分心与夸大，先聚焦一个目标。",
+    base:{love:66, academic:78, wealth:72, health:62} },
+  { name:"女祭司", upright:"直觉强，适合研究与等待信息明朗。", reversed:"疑虑过多，先把事实查清。",
+    base:{love:62, academic:82, wealth:58, health:66} },
+  { name:"女皇", upright:"滋养与成长，关系/成果更容易开花。", reversed:"过度放纵或消耗，注意边界与自律。",
+    base:{love:80, academic:70, wealth:74, health:72} },
+  { name:"皇帝", upright:"结构与掌控，适合制定规则与推进。", reversed:"控制欲过强，学会协商与放手。",
+    base:{love:60, academic:74, wealth:78, health:64} },
+  { name:"教皇", upright:"传统路径稳妥，适合求教/跟导师走。", reversed:"过度依赖权威，保留独立判断。",
+    base:{love:64, academic:76, wealth:62, health:66} },
+  { name:"恋人", upright:"重要选择与契合，沟通能带来进展。", reversed:"摇摆与误会，先把需求说清。",
+    base:{love:88, academic:66, wealth:64, health:62} },
+  { name:"战车", upright:"推进很快，适合冲刺与拿结果。", reversed:"节奏失控，先把优先级排好。",
+    base:{love:62, academic:78, wealth:70, health:60} },
+  { name:"力量", upright:"耐力与温和的掌控，长期更有利。", reversed:"情绪消耗，注意休息与恢复。",
+    base:{love:70, academic:72, wealth:66, health:78} },
+  { name:"隐者", upright:"独处与深耕，适合闭关学习与整理。", reversed:"封闭过度，适当寻求支持。",
+    base:{love:54, academic:84, wealth:58, health:70} },
+  { name:"命运之轮", upright:"局势转机，抓住窗口期。", reversed:"波动加大，先稳住基本盘。",
+    base:{love:68, academic:70, wealth:70, health:66} },
+  { name:"正义", upright:"因果清晰，按规则做事有回报。", reversed:"偏差与不平衡，先把账算清。",
+    base:{love:64, academic:74, wealth:68, health:66} },
+  { name:"倒吊人", upright:"换角度与延迟满足，先投资能力。", reversed:"停滞拖延，做一个可执行的小动作。",
+    base:{love:58, academic:72, wealth:54, health:66} },
+  { name:"死神", upright:"结束旧模式，迎来重启。", reversed:"不肯放下，反复内耗。",
+    base:{love:60, academic:66, wealth:62, health:62} },
+  { name:"节制", upright:"平衡与修复，循序渐进最稳。", reversed:"过度极端，调整作息与节奏。",
+    base:{love:72, academic:72, wealth:64, health:80} },
+  { name:"恶魔", upright:"欲望与绑定，警惕沉迷与交易。", reversed:"挣脱束缚，重建自控。",
+    base:{love:56, academic:58, wealth:66, health:52} },
+  { name:"高塔", upright:"突变与打破，先止损再重建。", reversed:"危机缓解但仍需修补漏洞。",
+    base:{love:48, academic:60, wealth:52, health:50} },
+  { name:"星星", upright:"希望与疗愈，长期趋势向好。", reversed:"信心不足，先做小的正反馈。",
+    base:{love:76, academic:74, wealth:66, health:78} },
+  { name:"月亮", upright:"迷雾与情绪，信息不全先观察。", reversed:"真相浮出，适合做决定。",
+    base:{love:58, academic:62, wealth:58, health:60} },
+  { name:"太阳", upright:"清晰与成功，能见度高。", reversed:"短暂受阻，别过度悲观。",
+    base:{love:82, academic:80, wealth:78, health:76} },
+  { name:"审判", upright:"复盘与召唤，适合提交/答辩/转折。", reversed:"逃避复盘，错过关键机会。",
+    base:{love:66, academic:82, wealth:68, health:64} },
+  { name:"世界", upright:"完成与收官，阶段性成果落地。", reversed:"临门差一步，把细节补齐。",
+    base:{love:78, academic:78, wealth:76, health:72} }
+];
+
+// 逆位处理：分数固定扣/加，不用随机
+function applyReversal(scoreObj, reversed){
+  if(!reversed) return {...scoreObj};
+  // 逆位：整体 -8，健康额外 -2（保守），学术 -4（避免过拟合）
+  return {
+    love: clamp(scoreObj.love - 8, 0, 100),
+    academic: clamp(scoreObj.academic - 4, 0, 100),
+    wealth: clamp(scoreObj.wealth - 8, 0, 100),
+    health: clamp(scoreObj.health - 10, 0, 100)
+  };
+}
+
+function clamp(x, a, b){ return Math.max(a, Math.min(b, x)); }
+
+function pickCard(){
+  const idx = Math.floor(Math.random() * MAJOR.length);
+  const reversed = Math.random() < 0.35; // 逆位概率固定 35%
+  const c = MAJOR[idx];
+  const base = applyReversal(c.base, reversed);
+  const text = reversed ? c.reversed : c.upright;
+  return { name:c.name, reversed, base, text };
+}
+
+function weightedAvg(cards, weights){
+  const sumW = weights.reduce((a,b)=>a+b,0);
+  const agg = {love:0, academic:0, wealth:0, health:0};
+  cards.forEach((c,i)=>{
+    const w = weights[i]/sumW;
+    agg.love += c.base.love*w;
+    agg.academic += c.base.academic*w;
+    agg.wealth += c.base.wealth*w;
+    agg.health += c.base.health*w;
+  });
+  return {
+    love: Math.round(agg.love),
+    academic: Math.round(agg.academic),
+    wealth: Math.round(agg.wealth),
+    health: Math.round(agg.health)
+  };
+}
+
+// focus：不是随机，是确定性地改变“解释侧重”与呈现
+function focusLabel(v){
+  return ({
+    balanced:"综合",
+    love:"姻缘",
+    academic:"学术前途",
+    wealth:"财运",
+    health:"健康"
+  })[v] || "综合";
+}
+
+function advice(score, domain){
+
+  /* ===== 姻缘 ===== */
+  if(domain==="love"){
+
+    if(score>=90) return `
+姻缘能量处在极强共振区间，象征关系推进与定型的高概率窗口。无论是已有关系深化，还是新关系建立，都具备较高匹配度与外部助力。
+
+此阶段最关键的是“明确承诺与结构”。适合讨论长期规划、生活节奏与未来安排，把关系从情绪连接推进到现实协同。同时也要避免过度理想化，对方真实状态仍需观察与确认。
+
+总体属于情感发展黄金期，但经营质量决定最终稳定度。
+`;
+
+    if(score>=80) return `
+当前感情运势处在明显上升区间，关系互动频率与情绪回应度均有提升。适合增加相处密度，通过真实互动加深理解。
+
+这是一个可以推进但仍需经营的阶段。沟通质量、边界表达与节奏匹配尤为关键。只要避免情绪猜测与过度试探，关系稳定性会逐步增强。
+
+整体呈现温和扩张趋势。
+`;
+
+    if(score>=70) return `
+姻缘运势处在可发展区间，但推进节奏需谨慎控制。互动存在，但稳定度仍需时间验证。
+
+此阶段更适合通过沟通修正关系认知，例如需求表达、预期校准与情绪反馈。若处理得当，关系可逐步进入上升通道。
+
+属于磨合与观察并行阶段。
+`;
+
+    if(score>=60) return `
+感情能量偏平稳，既无明显阻力，也缺乏推进动力。互动更多停留在表层，深度连接仍需时间培养。
+
+建议减少情绪内耗，通过稳定陪伴与现实互动积累信任，而非急于定义关系。
+
+属于缓慢积累期。
+`;
+
+    return `
+姻缘运势处在收敛区间，更像是情绪整理与关系模式复盘阶段。此时推进关系往往阻力较大，容易因期待落差产生压力。
+
+建议把重心放在自我状态调整，例如情绪稳定、边界重建与过往经验反思。当内在稳定度提升后，关系自然更易进入良性循环。
+`;
+  }
+
+  /* ===== 学术 ===== */
+  if(domain==="academic"){
+
+    if(score>=90) return `
+学术能量处在高峰输出区，是典型成果爆发窗口。专注度、执行力与灵感同步提升，适合冲刺高难度任务与关键节点产出。
+
+优先推进论文写作、项目收尾或实验验证，把阶段性成果快速固化。同时注意节奏管理，避免高强度透支导致后期回落。
+
+属于产出效率极高阶段。
+`;
+
+    if(score>=80) return `
+学术运势进入明显上升区间，学习效率与理解深度均有所提升。适合集中处理复杂课题或结构性难题。
+
+通过阶段目标拆解与成果导向推进，可显著放大效率优势。只要维持稳定作息，产出质量会持续提升。
+
+属于冲刺与积累并行期。
+`;
+
+    if(score>=70) return `
+当前学术节奏稳步推进，适合基础夯实与方法论优化。对知识结构梳理、文献复盘与技能补强尤为有利。
+
+只要持续投入，后续进入高产出区概率较大。
+`;
+
+    if(score>=60) return `
+学习状态偏平稳，效率存在波动但仍可维持推进。建议通过清单化任务与固定学习时段建立稳定节奏。
+
+属于恢复与蓄力阶段。
+`;
+
+    return `
+学术能量偏低，更适合节奏重建而非高压冲刺。注意力分散与疲劳感较明显，强行推进反而降低效率。
+
+建议从作息与环境入手，逐步恢复专注能力。
+`;
+  }
+
+  /* ===== 财运 ===== */
+  if(domain==="wealth"){
+
+    if(score>=90) return `
+财运处在资源高度流动期，机会密度与收益潜力均较高。无论是投资、合作还是收入结构优化，都更易出现正向回报。
+
+但机会增加同时意味着风险并存。建议设定明确资金边界与风险控制线，避免因过度自信扩大波动。
+
+属于扩张与配置窗口期。
+`;
+
+    if(score>=80) return `
+财运进入增长区间，收入或机会来源逐步增加。适合推进结构优化，例如资产配置或技能投资。
+
+保持预算与风险控制，可实现稳步累积。
+`;
+
+    if(score>=70) return `
+财务节奏稳定，收益与支出基本平衡。更适合稳健理财与现金流管理，而非激进扩张。
+`;
+
+    if(score>=60) return `
+财运偏保守，资源流动性有限。建议减少非必要开支，优先建立安全储备。
+`;
+
+    return `
+财务能量收敛，支出压力可能上升。此阶段宜收缩与防守，避免高风险决策。
+`;
+  }
+
+  /* ===== 健康 ===== */
+  if(domain==="health"){
+
+    if(score>=90) return `
+健康能量处在高恢复与高稳定区，体能与精神状态均表现良好。适合维持训练节奏或推进体能目标。
+
+只要保持规律作息与运动，整体状态可长期稳定。
+`;
+
+    if(score>=80) return `
+健康状态良好，恢复力与抗压性较强。适合轻度强化训练与生活节奏优化。
+`;
+
+    if(score>=70) return `
+身体状态平稳，无明显风险，但需注意作息规律与压力管理。
+`;
+
+    if(score>=60) return `
+健康能量略有波动，容易疲劳或睡眠不足。建议优先调整作息。
+`;
+
+    return `
+健康运势偏弱，更适合恢复与修整。减少高压安排，优先保证休息。
+`;
+  }
+
+  return "按节奏推进即可。";
+}
+
+function renderBars(scores){
+  const items = [
+    ["姻缘", "love", scores.love],
+    ["学术前途", "academic", scores.academic],
+    ["财运", "wealth", scores.wealth],
+    ["健康", "health", scores.health]
+  ];
+  return `
+    <div class="grid">
+      ${items.map(([cn,key,val])=>`
+        <div class="kpi">
+          <b>${cn}</b>
+          <div class="score">${val}</div>
+          <div class="bar"><div style="width:${val}%"></div></div>
+          <div class="muted" style="margin-top:8px;">建议：${advice(val, key)}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function draw(){
+  const spread = document.getElementById("spread").value;
+  const focus = document.getElementById("focus").value;
+
+  let cards=[], weights=[];
+  if(spread==="one"){
+    cards = [pickCard()];
+    weights = [1];
+  }else{
+    cards = [pickCard(), pickCard(), pickCard()];
+    weights = [0.25, 0.5, 0.25]; // 过去/现在/未来
+  }
+
+  const scores = weightedAvg(cards, weights);
+
+  const cardHtml = cards.map((c,i)=>{
+    const pos = spread==="three" ? (i===0?"过去":i===1?"现在":"未来") : "本次";
+    return `
+      <div class="card">
+        <div><b>${pos}：</b>${c.name}<span class="pill">${c.reversed?"逆位":"正位"}</span></div>
+        <div class="muted" style="margin-top:8px;">${c.text}</div>
+        <div class="mono" style="margin-top:8px;">映射分：love ${c.base.love} | academic ${c.base.academic} | wealth ${c.base.wealth} | health ${c.base.health}</div>
+      </div>
+    `;
+  }).join("");
+
+  const r = document.getElementById("result");
+  r.style.display="block";
+  r.innerHTML = `
+    <div><b>侧重：</b>${focusLabel(focus)}（仅影响呈现，不影响抽牌）</div>
+    <div class="hr"></div>
+    <div><b>综合结果（四项评分）</b></div>
+    ${renderBars(scores)}
+    <div class="hr"></div>
+    <div><b>抽到的牌</b></div>
+    ${cardHtml}
+    <div class="hr"></div>
+    <div class="muted">提示：塔罗的随机性来自抽牌机制；分数与建议由固定牌义与映射规则生成。</div>
+  `;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>八字排盘</title>
+
+<style>
+
+body{
+  font-family:sans-serif;
+  background:#111;
+  color:#fff;
+  margin:0;
+  display:flex;
+  justify-content:center;
+}
+
+.wrap{
+  width:100%;
+  max-width:520px;
+  padding:20px;
+  text-align:center;
+}
+
+h2{margin-bottom:20px}
+
+input,select,button{
+  width:100%;
+  margin:10px auto;
+  padding:12px;
+  border-radius:6px;
+  border:1px solid #444;
+  background:#222;
+  color:#fff;
+}
+
+button{
+  background:#d4af37;
+  color:#000;
+  font-weight:bold;
+}
+
+.card{
+  border:1px solid #333;
+  padding:15px;
+  margin-top:20px;
+  border-radius:12px;
+  text-align:left;
+  white-space:pre-line;
+  line-height:1.7;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+
+.bar{height:10px;background:#333;margin-top:5px}
+.bar div{height:100%;background:#fff}
+
+canvas{
+  margin-top:20px;
+  background:#000;
+  border:1px solid #333;
+}
+
+.timeline{
+  margin-top:20px;
+  text-align:left;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+<h2>八字排盘</h2>
+
+<input type="datetime-local" id="dt">
+
+<select id="sex">
+<option value="男">男</option>
+<option value="女">女</option>
+</select>
+
+<button onclick="calc()">排盘</button>
+
+<div id="out" class="card"></div>
+
+<canvas id="radar" width="400" height="300"></canvas>
+<canvas id="fortuneChart" width="400" height="300"></canvas>
+
+<div id="timeline" class="timeline"></div>
+
+</div>
+
+<script src="lunar-javascript-master/lunar.js"></script>
+
+<script>
+
+/* ===== 五行映射 ===== */
+
+const ganWuxing={
+甲:"木",乙:"木",丙:"火",丁:"火",
+戊:"土",己:"土",庚:"金",辛:"金",
+壬:"水",癸:"水"
+};
+
+const zhiWuxing={
+子:"水",丑:"土",寅:"木",卯:"木",
+辰:"土",巳:"火",午:"火",未:"土",
+申:"金",酉:"金",戌:"土",亥:"水"
+};
+
+/* ===== 主计算 ===== */
+
+function calc(){
+
+const date=new Date(dt.value);
+const solar=Solar.fromDate(date);
+const lunar=solar.getLunar();
+const ec=lunar.getEightChar();
+
+const pillars=[
+ec.getYear(),
+ec.getMonth(),
+ec.getDay(),
+ec.getTime()
+];
+
+const wx={木:0,火:0,土:0,金:0,水:0};
+
+pillars.forEach(p=>{
+wx[ganWuxing[p[0]]]++
+wx[zhiWuxing[p[1]]]++
+});
+
+const arr=Object.values(wx);
+const balance=1-(Math.max(...arr)-Math.min(...arr))/8;
+
+/* ===== 四项评分 ===== */
+
+const health=Math.round(60+balance*40);
+const academic=Math.round(55+wx.水*5+wx.木*4);
+const wealth=Math.round(55+wx.金*5+wx.土*4);
+const love=Math.round(55+balance*20+wx.火*3);
+
+/* ===== 输出 ===== */
+
+out.innerHTML=`
+
+【四柱八字】
+年柱：${pillars[0]}
+月柱：${pillars[1]}
+日柱：${pillars[2]}
+时柱：${pillars[3]}
+
+【五行统计】
+木 ${wx.木} ｜ 火 ${wx.火} ｜ 土 ${wx.土} ｜ 金 ${wx.金} ｜ 水 ${wx.水}
+平衡度：${balance.toFixed(2)}
+
+【四项运势】
+${bar("姻缘",love)}
+${bar("学术",academic)}
+${bar("财运",wealth)}
+${bar("健康",health)}
+
+【单项解读】
+姻缘：
+${advice("love",love)}
+
+学术：
+${advice("academic",academic)}
+
+财运：
+${advice("wealth",wealth)}
+
+健康：
+${advice("health",health)}
+
+【八字综合结论】
+${baziConclusion(love,academic,wealth,health)}
+
+【总评】
+${overallSummary(love,academic,wealth,health,balance)}
+`;
+
+drawRadar(wx);
+drawFortune(love,academic,wealth,health);
+drawTimeline(date);
+}
+
+/* ===== 进度条 ===== */
+
+function bar(name,v){
+return `${name} ${v}
+<div class="bar"><div style="width:${v}%"></div></div>`;
+}
+
+/* ===== 单项长文案 ===== */
+
+function advice(k,v){
+
+if(v>=80) return `运势处在明显上升窗口期，适合主动推进与结构定型。行动效率与外部配合度较高，可优先处理长期收益事项，同时注意节奏管理避免透支。`;
+
+if(v>=65) return `运势处在稳步运行区间，可发展但需经营。建议通过沟通、复盘与结构优化推进，而非盲目加速。`;
+
+return `运势偏收敛，更适合调整与恢复。优先稳住基础节奏，减少高压决策，等待状态回升。`;
+}
+
+/* ===== 八字综合结论（三档） ===== */
+
+function baziConclusion(l,a,w,h){
+
+const avg=(l+a+w+h)/4;
+
+if(avg>=75) return `
+整体格局处在顺运区间，各领域呈协同上升趋势。推进效率高，适合扩张与成果固化。`;
+
+if(avg>=65) return `
+整体运势稳中有进，属于修正与蓄力周期。通过结构优化可逐步进入高运阶段。`;
+
+return `
+整体处在调整期，更适合收缩、复盘与恢复，为后续上升做准备。`;
+}
+
+/* ===== 总评（新增） ===== */
+
+function overallSummary(l,a,w,h,balance){
+
+const avg=(l+a+w+h)/4;
+
+let trend="";
+
+if(avg>=75) trend="整体运势处在上升扩张周期";
+else if(avg>=65) trend="整体运势处在稳步修正周期";
+else trend="整体运势处在收敛调整周期";
+
+return `
+${trend}。四项运势分布显示当前人生重心正在重新配置，五行平衡度为 ${balance.toFixed(2)}，说明内外节奏匹配度处在可控区间。
+
+建议以长期结构稳定为核心目标，在关系、学业与资源配置之间保持均衡投入。当节奏稳定后，运势上行斜率会进一步放大。
+`;
+}
+
+/* ===== 雷达图 ===== */
+
+function drawRadar(wx){
+
+const ctx=radar.getContext("2d");
+ctx.clearRect(0,0,400,300);
+
+const data=[wx.木,wx.火,wx.土,wx.金,wx.水];
+const cx=200,cy=150,r=100;
+
+ctx.beginPath();
+
+data.forEach((v,i)=>{
+const ang=(Math.PI*2/5)*i-Math.PI/2;
+const rr=v*20;
+const x=cx+rr*Math.cos(ang);
+const y=cy+rr*Math.sin(ang);
+i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+});
+
+ctx.closePath();
+ctx.fillStyle="rgba(212,175,55,0.5)";
+ctx.fill();
+}
+
+/* ===== 运势柱状 ===== */
+
+function drawFortune(l,a,w,h){
+
+const ctx=fortuneChart.getContext("2d");
+ctx.clearRect(0,0,400,300);
+
+const data=[l,a,w,h];
+
+data.forEach((v,i)=>{
+ctx.fillStyle="#d4af37";
+ctx.fillRect(i*90+30,300-v*2,40,v*2);
+});
+}
+
+/* ===== 时间轴 ===== */
+
+function drawTimeline(date){
+
+let year=date.getFullYear();
+let html="<b>大运时间轴（简化）</b>";
+
+for(let i=0;i<8;i++){
+html+=`<div>${year+i*10} 年运势节点</div>`;
+}
+
+timeline.innerHTML=html;
+}
+
+</script>
+
+</body>
+</html>
